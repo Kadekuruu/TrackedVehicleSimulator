@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public class VehicleMovement : MonoBehaviour // Tracked Vehicle Movement inherits from TrackedVehicleController, as a child class
+public class VehicleMovement : MonoBehaviour
 {
     // Track Rigidbody components
     [SerializeField] private Rigidbody leftTrackRigidbody;
@@ -64,6 +64,7 @@ public class VehicleMovement : MonoBehaviour // Tracked Vehicle Movement inherit
     private void FixedUpdate()
     {
         UpdateEngineRPM();
+        CalculateRadianRPM();
 
         if (isEngineOn)
         {
@@ -188,9 +189,14 @@ public class VehicleMovement : MonoBehaviour // Tracked Vehicle Movement inherit
         drivingForce = outputTorque / trackArea;
     }
 
+    public float CalculateRadianRPM()
+    {
+        engineRPMInRadians = engineRPM * (float)Math.PI / 60;
+        return engineRPMInRadians;
+    }
+
     private void OnGUI()
     {
-        float xPosition = 10;
         float baseYPosition = Screen.height - 210;
         float labelSpacing = 30;
         float width = 300;
@@ -199,12 +205,13 @@ public class VehicleMovement : MonoBehaviour // Tracked Vehicle Movement inherit
         GUI.skin.label.fontSize = 20;
         GUI.skin.label.normal.textColor = Color.black;
 
-        GUI.Label(new Rect(xPosition, baseYPosition, width, height), $"Gear: {currentGearIndex:F1} {(isInReverse ? "Reverse" : "Forward")}");
-        GUI.Label(new Rect(xPosition, baseYPosition + labelSpacing, width, height), $"Engine: {(isEngineOn ? "On" : "Off")}");
-        GUI.Label(new Rect(xPosition, baseYPosition + labelSpacing * 2, width, height), $"RPM: {engineRPM:F1}");
-        GUI.Label(new Rect(xPosition, baseYPosition + labelSpacing * 3, width, height), $"Engine Torque: {engineTorque:F1}");
-        GUI.Label(new Rect(xPosition, baseYPosition + labelSpacing * 4, width, height), $"Gearbox Torque: {gearboxTorque:F1}");
-        GUI.Label(new Rect(xPosition, baseYPosition + labelSpacing * 5, width, height), $"Output Torque: {outputTorque:F1}");
-        GUI.Label(new Rect(xPosition, baseYPosition + labelSpacing * 6, width, height), $"Driving Force: {drivingForce:F1}");
+        float leftXPosition = 10;
+        GUI.Label(new Rect(leftXPosition, baseYPosition, width, height), $"Gear: {currentGearIndex:F1} {(isInReverse ? "Reverse" : "Forward")}");
+        GUI.Label(new Rect(leftXPosition, baseYPosition + labelSpacing, width, height), $"Engine: {(isEngineOn ? "On" : "Off")}");
+        GUI.Label(new Rect(leftXPosition, baseYPosition + labelSpacing * 2, width, height), $"RPM: {engineRPM:F1}");
+        GUI.Label(new Rect(leftXPosition, baseYPosition + labelSpacing * 3, width, height), $"Engine Torque: {engineTorque:F1}");
+        GUI.Label(new Rect(leftXPosition, baseYPosition + labelSpacing * 4, width, height), $"Gearbox Torque: {gearboxTorque:F1}");
+        GUI.Label(new Rect(leftXPosition, baseYPosition + labelSpacing * 5, width, height), $"Output Torque: {outputTorque:F1}");
+        GUI.Label(new Rect(leftXPosition, baseYPosition + labelSpacing * 6, width, height), $"Driving Force: {drivingForce:F1}");
     }
 }
