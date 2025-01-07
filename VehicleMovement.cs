@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+//Movement script for TrackedVehicleSimulator
 public class VehicleMovement : MonoBehaviour
 {
     // Track Rigidbody components
@@ -11,10 +12,10 @@ public class VehicleMovement : MonoBehaviour
     [SerializeField] private Rigidbody rightTrackRigidbody;
 
     // Gear system variables
-    [SerializeField] private List<float> gearRatios = new List<float> { };
+    [SerializeField] private List<float> gearRatios = new List<float> { }; // Create a new list that will be populated in the Unity scene
     public int maxGearIndex = 0;
     private int minGearIndex = 0;
-    private int defaultGearIndex = 1;
+    public int defaultGearIndex = 1;
     public int currentGearIndex = 1;
     public float currentGearRatio = 0.0f;
     public bool isInReverse = false;
@@ -46,62 +47,67 @@ public class VehicleMovement : MonoBehaviour
 
     private void Awake()
     {
-        Application.targetFrameRate = 120; // Limit frame rate to avoid excessive FixedUpdate calls
+        Application.targetFrameRate = 120; // Limit framerate to avoid excessive Update calls
     }
 
+    // Start is called before first frame update
     private void Start()
     {
         maxGearIndex = gearRatios.Count - (1 + defaultGearIndex);
         currentGearIndex = defaultGearIndex;
     }
 
+    // Update is called once per frame
     private void Update()
     {
-        HandleEngineToggle();
+        HandleEngineToggle(); // A bug was encountered where excessive Update calls meant this was called twice, resolved by capping framerate
         HandleGearShift();
     }
 
     private void FixedUpdate()
     {
+        // These must be called in order, since they depend on eachother
         UpdateEngineRPM();
         CalculateRadianRPM();
 
-        if (isEngineOn)
+        if (isEngineOn) // Only runs if engine is on
         {
-            CalculateEngineTorque();
-            CalculateGearboxTorque();
-            CalculateOutputTorque();
-            CalculateDrivingForce();
+            // Calculate the four calculations needed
+            CombinedCalculations();
 
-            var (isLeftTrackActive, isRightTrackActive, isReversing) = GetTrackInputs();
-            ApplyDrivingForceToTracks(isLeftTrackActive, isRightTrackActive, isReversing);
+            var (isLeftTrackActive, isRightTrackActive, isReversing) = GetTrackInputs(); // Take apart the tuple returned by GetTrackInputs()
+            ApplyDrivingForceToTracks(isLeftTrackActive, isRightTrackActive, isReversing); // And use the tuple to call ApplyDrivingForceToTracks()
         }
     }
 
+    // This function gets key inputs and uses logic sequences to determine which tracks are active, and if the vehicle is in reverse
     private (bool isLeftTrackActive, bool isRightTrackActive, bool isReversing) GetTrackInputs()
     {
-        bool isForward = Input.GetKey(KeyCode.W);
+        bool isForward = Input.GetKey(KeyCode.W); // Input.GetKey instead of GetKeyDown, since it checks if the key is being held instead of pressed
         bool isLeft = Input.GetKey(KeyCode.A);
         bool isBackward = Input.GetKey(KeyCode.S);
         bool isRight = Input.GetKey(KeyCode.D);
 
+        // Logic sequence used to determine active tracks
         bool isLeftTrackActive = (isForward && !isRight) || (isBackward && !isLeft) || isLeft;
         bool isRightTrackActive = (isForward && !isLeft) || (isBackward && !isRight) || isRight;
         bool isReversing = isBackward;
 
-        isAccelerating = isLeftTrackActive || isRightTrackActive || isReversing;
+        isAccelerating = isLeftTrackActive || isRightTrackActive || isReversing; // Logic sequence used to determine if vehicle is accelerating
 
-        return (isLeftTrackActive, isRightTrackActive, isReversing);
+
+        return (isLeftTrackActive, isRightTrackActive, isReversing);  // Return a tuple since only one thing can be returned from a function
     }
 
+    // This function takes the previous outputs and applys the force accordingly
     private void ApplyDrivingForceToTracks(bool isLeftTrackActive, bool isRightTrackActive, bool isReversing)
     {
-        float forceDirection = isReversing ? 1.0f : -1.0f;
-        Vector3 drivingForceVector = new Vector3(0f, 0f, drivingForce * forceDirection);
+        float forceDirection = isReversing ? 1.0f : -1.0f; // Depending on if isReversing is True or False, apply positive or negative force to simulate reversing
+        Vector3 drivingForceVector = new Vector3(0f, 0f, drivingForce * forceDirection); // Create a new Vector3 on Z axis to simulate force applied by tracks in that direction
 
         if (isLeftTrackActive)
         {
-            leftTrackRigidbody.AddRelativeForce(drivingForceVector);
+            leftTrackRigidbody.AddRelativeForce(drivingForceVector); // Add relative force, since it applies locally to the Rigidbody instead of globally
         }
         if (isRightTrackActive)
         {
@@ -109,6 +115,7 @@ public class VehicleMovement : MonoBehaviour
         }
     }
 
+    // Function that toggles engine when keydown is detected, not held
     private void HandleEngineToggle()
     {
         if (Input.GetKeyDown(KeyCode.I))
@@ -117,18 +124,19 @@ public class VehicleMovement : MonoBehaviour
         }
     }
 
+    // Function that increments or decreases the index of the gear when keydown
     private void HandleGearShift()
     {
         if (Input.GetKeyDown(KeyCode.R))
         {
-            if (currentGearIndex < maxGearIndex)
+            if (currentGearIndex < maxGearIndex) // Ensure index doesn't go above maximum assigned index
             {
                 currentGearIndex++;
             }
         }
         else if (Input.GetKeyDown(KeyCode.F))
         {
-            if (currentGearIndex > minGearIndex)
+            if (currentGearIndex > minGearIndex) // Ensure index doesn't go below minimum assigned index
             {
                 currentGearIndex--;
             }
@@ -136,11 +144,20 @@ public class VehicleMovement : MonoBehaviour
         UpdateReverseStatus();
     }
 
+    // Determine if the current gear is reverse or not
     private void UpdateReverseStatus()
     {
-        isInReverse = gearRatios[currentGearIndex] < 0;
+        if (gearRatios[currentGearIndex] < defaultGearIndex) // If the current gear is below the default gear, it has to be in reverse gear
+        {
+            isInReverse = true;
+        }
+        else if (gearRatios[currentGearIndex] >= currentGearIndex)
+        {
+            isInReverse = false;
+        }
     }
 
+    // Simple implementation to simulate the increase and decreasing of engine RPM, can be modified to be more advanced in the future
     private void UpdateEngineRPM()
     {
         if (isAccelerating)
@@ -159,7 +176,7 @@ public class VehicleMovement : MonoBehaviour
                 engineRPM = idleEngineRPM;
             }
         }
-        else if (!isEngineOn && engineRPM > 0.0f)
+        else if (!isEngineOn && engineRPM > 0.0f) // Decrease RPM to 0 if engine is off
         {
             engineRPM -= 500f * Time.deltaTime;
             if (engineRPM < 0.0f)
@@ -169,32 +186,43 @@ public class VehicleMovement : MonoBehaviour
         }
     }
 
-    private void CalculateEngineTorque()
+    private void CombinedCalculations()
     {
-        engineTorque = enginePowerInKW / engineRPMInRadians;
+        engineTorque = enginePowerInKW / engineRPMInRadians; // Calculate the engine torque
+        gearboxTorque = engineTorque * gearRatios[currentGearIndex] * Mathf.Clamp(engineRPM / maxEngineRPM, 0.1f, 1.0f); // Calculate the torque at gearbox, Mathf.Clamp limits the lower multiplier to 0.1 and upper to 1.0 to prevent unrealistic results
+        outputTorque = gearboxTorque * finalDriveRatio; // Calculate the output torque at the final drive
+        drivingForce = outputTorque / trackArea; // Calculate the final driving force
     }
 
-    private void CalculateGearboxTorque()
-    {
-        gearboxTorque = engineTorque * gearRatios[currentGearIndex];
-    }
+    // These really don't need to be separate functions, combined into the one above
+    //private void CalculateEngineTorque()
+    //{
+    //    engineTorque = enginePowerInKW / engineRPMInRadians;
+    //}
 
-    private void CalculateOutputTorque()
-    {
-        outputTorque = gearboxTorque * finalDriveRatio;
-    }
+    //private void CalculateGearboxTorque()
+    //{
+    //    gearboxTorque = engineTorque * gearRatios[currentGearIndex] * Mathf.Clamp(engineRPM / maxEngineRPM, 0.1f, 1.0f);
+    //}
 
-    private void CalculateDrivingForce()
-    {
-        drivingForce = outputTorque / trackArea;
-    }
+    //private void CalculateOutputTorque()
+    //{
+    //    outputTorque = gearboxTorque * finalDriveRatio;
+    //}
 
+    //private void CalculateDrivingForce()
+    //{
+    //    drivingForce = outputTorque / trackArea;
+    //}
+
+    // Calculate the engine RPM in radians
     public float CalculateRadianRPM()
     {
         engineRPMInRadians = engineRPM * (float)Math.PI / 60;
         return engineRPMInRadians;
     }
 
+    // Development GUI since we don't need anything more advanced currently
     private void OnGUI()
     {
         float baseYPosition = Screen.height - 210;
